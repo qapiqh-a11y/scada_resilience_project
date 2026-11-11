@@ -1,0 +1,61 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: scada-load
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 900
+  template:
+    metadata:
+      labels:
+        app: scada-load
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: loadgen
+          image: python:3.12-slim
+          command: ["sh", "-c"]
+          args:
+            - >-
+              python /code/loadgen.py
+              --url http://scada-core:8000/work
+              --output /results/${MODE}.csv
+              --duration ${DURATION_S}
+              --rate ${RATE_RPS}
+              --timeout 1.5;
+              python /code/metrics.py /results/${MODE}.csv
+          env:
+            - name: MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: scada-run-settings
+                  key: mode
+            - name: DURATION_S
+              valueFrom:
+                configMapKeyRef:
+                  name: scada-run-settings
+                  key: duration_s
+            - name: RATE_RPS
+              valueFrom:
+                configMapKeyRef:
+                  name: scada-run-settings
+                  key: rate_rps
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: code
+              mountPath: /code
+              readOnly: true
+            - name: results
+              mountPath: /results
+      volumes:
+        - name: code
+          configMap:
+            name: scada-code
+        - name: results
+          emptyDir: {}

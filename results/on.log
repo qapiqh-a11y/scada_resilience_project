@@ -1,0 +1,2 @@
+mode=on duration_s=120 rate_rps=20 fault_start_s=30 fault_duration_s=30 fault_delay_ms=2000 client_timeout_s=1.5 threshold=3 recovery_timeout_s=5
+requests=2400 failures=0 degraded=625 duration_s=120.014 POFOD=0 ROCOF_per_h=0 AVAIL=1 p50_ms=20.3 p95_ms=42.7 p99_ms=1006.5

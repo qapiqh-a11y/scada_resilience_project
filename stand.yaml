@@ -1,0 +1,178 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scada-dep
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scada-dep
+  template:
+    metadata:
+      labels:
+        app: scada-dep
+    spec:
+      containers:
+        - name: dep
+          image: python:3.12-slim
+          command: ["python", "/code/dep.py"]
+          env:
+            - name: FAULT_FILE
+              value: /tmp/scada/fault.json
+          ports:
+            - containerPort: 8001
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            periodSeconds: 2
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          volumeMounts:
+            - name: code
+              mountPath: /code
+              readOnly: true
+            - name: fault
+              mountPath: /tmp/scada
+      volumes:
+        - name: code
+          configMap:
+            name: scada-code
+        - name: fault
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dep-a
+spec:
+  selector:
+    app: scada-dep
+  ports:
+    - name: http
+      port: 8001
+      targetPort: 8001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scada-core
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: scada-core
+  template:
+    metadata:
+      labels:
+        app: scada-core
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: scada-core
+      containers:
+        - name: core
+          image: python:3.12-slim
+          command: ["python", "/code/server.py"]
+          env:
+            - name: PATTERN
+              value: "off"
+            - name: DEP_URL
+              value: http://dep-a:8001/work
+            - name: FAILURE_THRESHOLD
+              value: "3"
+            - name: TIMEOUT_S
+              value: "1.0"
+            - name: RECOVERY_TIMEOUT_S
+              value: "5.0"
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 2
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: code
+              mountPath: /code
+              readOnly: true
+      volumes:
+        - name: code
+          configMap:
+            name: scada-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scada-core
+spec:
+  selector:
+    app: scada-core
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: scada-core
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: scada-core
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dep-a-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: scada-dep
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: scada-core
+      ports:
+        - protocol: TCP
+          port: 8001
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: core-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: scada-core
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: scada-load
+      ports:
+        - protocol: TCP
+          port: 8000
