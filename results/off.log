@@ -1,3 +1,3 @@
-started_utc=2026-11-17T06:25:47.970787+00:00
-mode=off duration_s=40 rate_rps=20 fault_start_s=10 fault_duration_s=10 fault_delay_ms=2000 client_timeout_s=1.5
-requests=800 failures=200 degraded=0 duration_s=40.001 POFOD=0.25 ROCOF_per_h=89.9978 AVAIL=0.75 p50_ms=34.3 p95_ms=1530.8 p99_ms=1536.8
+started_utc=2026-11-17T11:49:15.249265+00:00
+mode=off duration_s=120 rate_rps=20 fault_start_s=30 fault_duration_s=30 fault_delay_ms=2000 client_timeout_s=1.5
+requests=2400 failures=600 degraded=0 duration_s=120.006 POFOD=0.25 ROCOF_per_h=29.9985 AVAIL=0.75 p50_ms=36.5 p95_ms=1530.5 p99_ms=1535.6

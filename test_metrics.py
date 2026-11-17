@@ -48,6 +48,26 @@ class MetricsTests(unittest.TestCase):
         self.assertEqual(result["failures"], 0)
         self.assertEqual(result["degraded"], 1)
 
+    def test_failures_less_than_two_seconds_apart_form_one_episode(self):
+        rows = [
+            {"elapsed_s": 0.0, "http_code": 500, "latency_ms": 10, "response_status": "failed"},
+            {"elapsed_s": 0.5, "http_code": 200, "latency_ms": 10, "response_status": "ok"},
+            {"elapsed_s": 1.5, "http_code": 503, "latency_ms": 10, "response_status": "failed"},
+            {"elapsed_s": 3.5, "http_code": 500, "latency_ms": 10, "response_status": "failed"},
+        ]
+        result = calculate(self.write_rows(rows))
+        self.assertAlmostEqual(result["ROCOF_per_h"], 1600.0)
+
+    def test_availability_is_measured_per_second(self):
+        rows = [
+            {"elapsed_s": 0.0, "http_code": 500, "latency_ms": 10, "response_status": "failed"},
+            {"elapsed_s": 0.5, "http_code": 200, "latency_ms": 10, "response_status": "ok"},
+            {"elapsed_s": 1.0, "http_code": 500, "latency_ms": 10, "response_status": "failed"},
+            {"elapsed_s": 1.5, "http_code": 500, "latency_ms": 10, "response_status": "failed"},
+        ]
+        result = calculate(self.write_rows(rows))
+        self.assertEqual(result["AVAIL"], 0.5)
+
 
 if __name__ == "__main__":
     unittest.main()

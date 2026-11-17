@@ -25,18 +25,34 @@ def is_failed(row):
     return int(row["http_code"]) == 0 or int(row["http_code"]) >= 500
 
 
+def failure_episodes(failures, max_gap_s=2.0):
+    timestamps = sorted(float(row["elapsed_s"]) for row in failures)
+    if not timestamps:
+        return 0
+    return 1 + sum(
+        current - previous >= max_gap_s
+        for previous, current in zip(timestamps, timestamps[1:])
+    )
+
+
+def available_second_ratio(rows, duration):
+    if not rows or duration <= 0:
+        return 0
+    seconds = max(1, int(round(duration)))
+    available = {
+        min(seconds - 1, int(float(row["elapsed_s"])))
+        for row in rows
+        if not is_failed(row)
+    }
+    return len(available) / seconds
+
+
 def calculate(path):
     with open(path, newline="", encoding="utf-8") as handle:
         rows = sorted(csv.DictReader(handle), key=lambda row: float(row["elapsed_s"]))
     failures = [row for row in rows if is_failed(row)]
     duration = observation_duration(rows)
-    episodes = 0
-    previous_failed = False
-    for row in rows:
-        failed = is_failed(row)
-        if failed and not previous_failed:
-            episodes += 1
-        previous_failed = failed
+    episodes = failure_episodes(failures)
     latencies = [float(row["latency_ms"]) for row in rows]
     degraded = sum(row.get("response_status") == "degraded" for row in rows)
     return {
@@ -46,7 +62,7 @@ def calculate(path):
         "duration_s": duration,
         "POFOD": len(failures) / len(rows) if rows else 0,
         "ROCOF_per_h": episodes / duration * 3600 if duration else 0,
-        "AVAIL": 1 - len(failures) / len(rows) if rows else 0,
+        "AVAIL": available_second_ratio(rows, duration),
         "p50_ms": percentile(latencies, 0.50),
         "p95_ms": percentile(latencies, 0.95),
         "p99_ms": percentile(latencies, 0.99),
