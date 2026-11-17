@@ -23,7 +23,10 @@ spec:
               --duration ${DURATION_S}
               --rate ${RATE_RPS}
               --timeout 1.5;
-              python /code/metrics.py /results/${MODE}.csv
+              python /code/metrics.py /results/${MODE}.csv;
+              echo __SCADA_CSV_BEGIN__;
+              cat /results/${MODE}.csv;
+              echo __SCADA_CSV_END__
           env:
             - name: MODE
               valueFrom:

@@ -42,8 +42,13 @@ kubectl exec deployment/scada-dep -- sh -c \
 
 kubectl wait --for=condition=complete job/scada-load --timeout=180s
 pod="$(kubectl get pods -l job-name=scada-load -o jsonpath='{.items[0].metadata.name}')"
-kubectl cp "$pod:/results/$mode.csv" "results/$mode.csv"
 kubectl logs "$pod" > "results/$mode.log"
+sed -n '/^__SCADA_CSV_BEGIN__$/,/^__SCADA_CSV_END__$/p' "results/$mode.log" \
+  | sed '1d;$d' > "results/$mode.csv"
+if [ ! -s "results/$mode.csv" ]; then
+  echo "failed to extract CSV from job logs" >&2
+  exit 1
+fi
 python3 metrics.py "results/$mode.csv" | tee -a "results/$mode.log"
 
 echo "saved results/$mode.csv and results/$mode.log"
